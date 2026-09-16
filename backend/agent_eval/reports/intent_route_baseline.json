@@ -1,6 +1,6 @@
 {
   "evaluation": "deterministic_forecast_intent_parser",
-  "generated_at": "2026-09-15T15:10:57.580573+00:00",
+  "generated_at": "2026-09-16T06:51:19.660455+00:00",
   "cases": 180,
   "route_accuracy": 0.8944444444444445,
   "deterministic_route": {

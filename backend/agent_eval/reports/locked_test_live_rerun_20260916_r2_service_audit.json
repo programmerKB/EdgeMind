@@ -1,0 +1,261 @@
+{
+  "interpretation": "Raw metrics include model-service failures as failed tasks. Conditional metrics exclude only the explicit busy/retry-exhausted model-service error. pass^k is intentionally omitted from the conditional section and is not reportable for this run.",
+  "attempted_runs": 90,
+  "model_service_failures": 0,
+  "model_service_failure_rate": 0.0,
+  "eligible_agent_runs": 90,
+  "eligible_case_coverage": 90,
+  "failure_messages": {},
+  "by_run": {
+    "1": {
+      "attempts": 90,
+      "model_service_failures": 0,
+      "model_service_failure_rate": 0.0
+    }
+  },
+  "raw_metrics": {
+    "cases_evaluated": 90,
+    "runs_evaluated": 90,
+    "repetitions": 1,
+    "need_tool": {
+      "precision": 0.9027777777777778,
+      "recall": 0.9848484848484849,
+      "f1": 0.9420289855072465,
+      "confusion_matrix": {
+        "tp": 65,
+        "fp": 7,
+        "fn": 1,
+        "tn": 17
+      }
+    },
+    "tool_name_accuracy": 0.9545454545454546,
+    "argument_exact_match": 0.8939393939393939,
+    "argument_field_accuracy": {
+      "model_name": 0.9565217391304348,
+      "motor_id": 0.9848484848484849,
+      "training_motor_id": 0.75
+    },
+    "tool_sequence_accuracy": 0.8888888888888888,
+    "extra_tool_call_rate": 0.1,
+    "route_accuracy": 0.7111111111111111,
+    "key_fact_recall": 0.9064814814814814,
+    "grounded_claim_precision": 0.9810114128295946,
+    "hallucination_rate": 0.06666666666666667,
+    "task_success_rate": 0.6666666666666666,
+    "error_handling_accuracy": 0.8571428571428571,
+    "reliability": {
+      "pass^1": 0.6666666666666666,
+      "mean_run_success": 0.6666666666666666,
+      "run_success_stddev": 0.0
+    },
+    "efficiency": {
+      "mean_total_tokens": 791.3777777777777,
+      "total_tokens": 71224.0,
+      "p50_latency_ms": 2170.556,
+      "p95_latency_ms": 10961.944749999997,
+      "mean_tool_calls": 0.8222222222222222
+    },
+    "by_category": {
+      "boundary_or_attack": {
+        "runs": 8,
+        "task_success_rate": 0.625,
+        "key_fact_recall": 0.8125,
+        "hallucination_rate": 0.0
+      },
+      "cross_device_forecast": {
+        "runs": 15,
+        "task_success_rate": 0.4666666666666667,
+        "key_fact_recall": 0.9166666666666666,
+        "hallucination_rate": 0.2
+      },
+      "current_status": {
+        "runs": 15,
+        "task_success_rate": 1.0,
+        "key_fact_recall": 1.0,
+        "hallucination_rate": 0.0
+      },
+      "data_or_system_error": {
+        "runs": 7,
+        "task_success_rate": 0.8571428571428571,
+        "key_fact_recall": 1.0,
+        "hallucination_rate": 0.0
+      },
+      "implicit_forecast": {
+        "runs": 10,
+        "task_success_rate": 0.5,
+        "key_fact_recall": 0.9,
+        "hallucination_rate": 0.2
+      },
+      "insufficient_negation_conflict": {
+        "runs": 10,
+        "task_success_rate": 0.3,
+        "key_fact_recall": 0.7333333333333333,
+        "hallucination_rate": 0.0
+      },
+      "knowledge_no_tool": {
+        "runs": 10,
+        "task_success_rate": 0.8,
+        "key_fact_recall": 0.9,
+        "hallucination_rate": 0.0
+      },
+      "same_device_forecast": {
+        "runs": 15,
+        "task_success_rate": 0.7333333333333333,
+        "key_fact_recall": 0.9333333333333333,
+        "hallucination_rate": 0.06666666666666667
+      }
+    },
+    "failed_case_ids": [
+      "A-008",
+      "A-014",
+      "A-015",
+      "E-011",
+      "F-CROSS-016",
+      "F-CROSS-017",
+      "F-CROSS-018",
+      "F-CROSS-019",
+      "F-CROSS-020",
+      "F-CROSS-025",
+      "F-CROSS-026",
+      "F-CROSS-029",
+      "F-IMPLICIT-012",
+      "F-IMPLICIT-014",
+      "F-IMPLICIT-015",
+      "F-IMPLICIT-017",
+      "F-IMPLICIT-018",
+      "F-SAME-017",
+      "F-SAME-019",
+      "F-SAME-024",
+      "F-SAME-029",
+      "I-013",
+      "I-015",
+      "I-016",
+      "I-017",
+      "I-018",
+      "I-019",
+      "I-020",
+      "K-013",
+      "K-015"
+    ]
+  },
+  "conditional_agent_metrics": {
+    "cases_evaluated": 90,
+    "runs_evaluated": 90,
+    "repetitions": 1,
+    "need_tool": {
+      "precision": 0.9027777777777778,
+      "recall": 0.9848484848484849,
+      "f1": 0.9420289855072465,
+      "confusion_matrix": {
+        "tp": 65,
+        "fp": 7,
+        "fn": 1,
+        "tn": 17
+      }
+    },
+    "tool_name_accuracy": 0.9545454545454546,
+    "argument_exact_match": 0.8939393939393939,
+    "argument_field_accuracy": {
+      "model_name": 0.9565217391304348,
+      "motor_id": 0.9848484848484849,
+      "training_motor_id": 0.75
+    },
+    "tool_sequence_accuracy": 0.8888888888888888,
+    "extra_tool_call_rate": 0.1,
+    "route_accuracy": 0.7111111111111111,
+    "key_fact_recall": 0.9064814814814814,
+    "grounded_claim_precision": 0.9810114128295946,
+    "hallucination_rate": 0.06666666666666667,
+    "task_success_rate": 0.6666666666666666,
+    "error_handling_accuracy": 0.8571428571428571,
+    "efficiency": {
+      "mean_total_tokens": 791.3777777777777,
+      "total_tokens": 71224.0,
+      "p50_latency_ms": 2170.556,
+      "p95_latency_ms": 10961.944749999997,
+      "mean_tool_calls": 0.8222222222222222
+    },
+    "by_category": {
+      "boundary_or_attack": {
+        "runs": 8,
+        "task_success_rate": 0.625,
+        "key_fact_recall": 0.8125,
+        "hallucination_rate": 0.0
+      },
+      "cross_device_forecast": {
+        "runs": 15,
+        "task_success_rate": 0.4666666666666667,
+        "key_fact_recall": 0.9166666666666666,
+        "hallucination_rate": 0.2
+      },
+      "current_status": {
+        "runs": 15,
+        "task_success_rate": 1.0,
+        "key_fact_recall": 1.0,
+        "hallucination_rate": 0.0
+      },
+      "data_or_system_error": {
+        "runs": 7,
+        "task_success_rate": 0.8571428571428571,
+        "key_fact_recall": 1.0,
+        "hallucination_rate": 0.0
+      },
+      "implicit_forecast": {
+        "runs": 10,
+        "task_success_rate": 0.5,
+        "key_fact_recall": 0.9,
+        "hallucination_rate": 0.2
+      },
+      "insufficient_negation_conflict": {
+        "runs": 10,
+        "task_success_rate": 0.3,
+        "key_fact_recall": 0.7333333333333333,
+        "hallucination_rate": 0.0
+      },
+      "knowledge_no_tool": {
+        "runs": 10,
+        "task_success_rate": 0.8,
+        "key_fact_recall": 0.9,
+        "hallucination_rate": 0.0
+      },
+      "same_device_forecast": {
+        "runs": 15,
+        "task_success_rate": 0.7333333333333333,
+        "key_fact_recall": 0.9333333333333333,
+        "hallucination_rate": 0.06666666666666667
+      }
+    },
+    "failed_case_ids": [
+      "A-008",
+      "A-014",
+      "A-015",
+      "E-011",
+      "F-CROSS-016",
+      "F-CROSS-017",
+      "F-CROSS-018",
+      "F-CROSS-019",
+      "F-CROSS-020",
+      "F-CROSS-025",
+      "F-CROSS-026",
+      "F-CROSS-029",
+      "F-IMPLICIT-012",
+      "F-IMPLICIT-014",
+      "F-IMPLICIT-015",
+      "F-IMPLICIT-017",
+      "F-IMPLICIT-018",
+      "F-SAME-017",
+      "F-SAME-019",
+      "F-SAME-024",
+      "F-SAME-029",
+      "I-013",
+      "I-015",
+      "I-016",
+      "I-017",
+      "I-018",
+      "I-019",
+      "I-020",
+      "K-013",
+      "K-015"
+    ]
+  }
+}
