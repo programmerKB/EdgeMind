@@ -64,8 +64,8 @@ docker info
 ### 2. 取得專案
 
 ```bash
-git clone https://github.com/programmerKB/Edge-mind.git
-cd Edge-mind
+git clone https://github.com/programmerKB/EdgeMind.git
+cd EdgeMind
 ```
 
 ### 3. 建立環境設定
@@ -169,19 +169,42 @@ curl 'http://127.0.0.1:8000/api/predictions/temperature/DEMO-2?training_motor_id
 
 ## 系統架構
 
+下圖表示執行時的請求與資料流；箭頭不代表 Python 模組的匯入方向。
+
 ```mermaid
 flowchart LR
-    UI[React Web UI] -->|SSE / REST| P[Presentation]
-    P --> A[Application Use Cases]
-    A --> D[Domain Rules]
-    I[Infrastructure Adapters] -. implements ports .-> A
-    I --> DB[(PostgreSQL)]
-    I --> G[Gemini]
-    I --> FS[CSV / SVG Files]
-    B[Bootstrap] --> P
-    B --> A
-    B --> I
+    USER[使用者]
+    SENSOR[感測設備／資料提供端]
+    GEMINI[Google Gemini API]
+
+    subgraph EDGE[EdgeMind 系統]
+        UI[React Web UI<br/>瀏覽器中的聊天・圖表・狀態]
+        PROXY[Nginx 正式／Vite 開發<br/>網頁與 /api 代理]
+
+        subgraph BACKEND[FastAPI 後端]
+            API[Presentation<br/>REST API・SSE]
+            APP[Application<br/>Agent・感測資料・預測流程]
+            RIDGE[Domain<br/>Ridge 訓練・推論・評估]
+            ADAPTER[Infrastructure<br/>資料庫・Gemini・報表 adapter]
+        end
+
+        DB[(PostgreSQL<br/>感測資料・模型)]
+        FILES[(backend/outputs<br/>CSV・SVG・JSON)]
+    end
+
+    USER --> UI
+    UI <-->|HTTP| PROXY
+    PROXY <-->|REST／SSE| API
+    SENSOR -.->|外部程式 POST /api/sensor-readings| PROXY
+    API --> APP
+    APP --> RIDGE
+    APP -->|透過 ports| ADAPTER
+    ADAPTER --> DB
+    ADAPTER --> FILES
+    ADAPTER -->|Google Gen AI SDK| GEMINI
 ```
+
+感測設備目前沒有內建 MQTT、Modbus 或其他設備通訊客戶端；資料需由外部程式經 `/api` 代理呼叫 `POST /api/sensor-readings` 寫入。Ridge 訓練、推論與評估在後端執行，PostgreSQL 儲存感測紀錄與模型，報表則寫入 `backend/outputs`。Gemini 是系統外部的模型服務，負責 Agent 的工具決策與文字摘要，不執行 Ridge 數值預測。
 
 後端不是只依資料夾分類，而是以 application-owned ports 保持單向依賴：
 
