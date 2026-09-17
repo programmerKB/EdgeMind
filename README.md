@@ -88,7 +88,7 @@ POSTGRES_PASSWORD=請改成高強度密碼
 POSTGRES_DB=motor_monitor_db
 DATABASE_URL=postgresql://agent_user:請改成高強度密碼@db:5432/motor_monitor_db
 
-# 開發環境可使用 true；正式部署腳本會強制設為 false
+# 開發或示範環境使用 true；正式環境若只使用真實資料則設為 false
 SEED_DEMO_DATA=true
 
 # 推論輸出與異常判定
@@ -134,7 +134,7 @@ docker logs --tail=100 agent-frontend
 
 ### Web UI
 
-開啟 <http://localhost:5173>。設備問答可直接輸入：
+開啟 <http://localhost:5173>。啟用 `SEED_DEMO_DATA=true` 後，設備問答可直接輸入：
 
 ```text
 請使用 DEMO-1 訓練的模型，推論 DEMO-2 在 30 分鐘後的溫度，並說明模型誤差
@@ -165,7 +165,7 @@ curl 'http://127.0.0.1:8000/api/predictions/temperature/DEMO-2?training_motor_id
 - `DEMO-1`：120 筆、每 5 分鐘一筆，供模型訓練與比較。
 - `DEMO-2`：120 筆獨立資料，可做推論與零樣本外部評估，不會被加入訓練資料。
 
-這些資料只用於確認流程，不代表真實設備表現。正式環境請設定 `SEED_DEMO_DATA=false`。
+這些資料只用於確認流程，不代表真實設備表現。正式環境要執行 `DEMO-1`／`DEMO-2` 範例時，需設定 `SEED_DEMO_DATA=true`；只使用真實設備資料時，請設為 `false`。
 
 ## 系統架構
 
@@ -485,13 +485,13 @@ npm run dev
 | 開發 | `./deploy-dev.sh` | `agent-postgres`、`agent-fastapi`、`agent-frontend` | `my_agent_project_postgres_dev_data` | 前後端原始碼掛載；Uvicorn 與 Vite 自動重載 |
 | 正式 | `./deploy-prod.sh` | `agent-postgres-prod`、`agent-fastapi-prod`、`agent-frontend-prod` | `my_agent_project_postgres_prod_data` | 已建置映像；Nginx 提供靜態檔案 |
 
-兩支腳本逐條執行 `docker build`、`docker network`、`docker volume`、`docker run` 等指令，建立獨立網路與資料 volume、啟動三個容器，並等待資料庫、後端、前端健康檢查通過。重跑腳本會先建置新映像，再更新該環境的容器；資料庫 named volume 與 `backend/outputs` 不會刪除。正式環境後端以非 root 身分執行，停用自動重載，且強制 `SEED_DEMO_DATA=false`。
+兩支腳本逐條執行 `docker build`、`docker network`、`docker volume`、`docker run` 等指令，建立獨立網路與資料 volume、啟動三個容器，並等待資料庫、後端、前端健康檢查通過。重跑腳本會先建置新映像，再更新該環境的容器；資料庫 named volume 與 `backend/outputs` 不會刪除。正式環境後端以非 root 身分執行並停用自動重載；示範資料依環境檔的 `SEED_DEMO_DATA` 設定，未設定時預設為 `false`。
 
 兩個環境預設使用相同的主機連接埠：前端 `5173`、後端 `8000`。切換環境前，先停止另一環境的容器；或在對應的環境檔改用未被占用的 `APP_PORT`、`BACKEND_PORT`。開發資料庫另佔主機 `127.0.0.1:5432`。正式資料庫只在容器網路上提供服務；兩個環境都只把後端連接埠綁定在主機 `127.0.0.1`，前端連接埠則可由區域網路存取。
 
 ### 正式部署
 
-依[快速啟動](#快速啟動)建立 `.env`，或以 `cp .env.example .env.prod` 為正式環境建立獨立設定；確認 `DATABASE_URL` 的主機是 `db:5432`、資料庫密碼與 `POSTGRES_PASSWORD` 相同，且 `CORS_ORIGINS` 為明確來源而非 `*`。正式報表保存在 `backend/outputs`；請讓該目錄可由容器內的 UID 1000 寫入。
+依[快速啟動](#快速啟動)建立 `.env`，或以 `cp .env.example .env.prod` 為正式環境建立獨立設定；確認 `DATABASE_URL` 的主機是 `db:5432`、資料庫密碼與 `POSTGRES_PASSWORD` 相同，且 `CORS_ORIGINS` 為明確來源而非 `*`。要在正式環境測試內建的 `DEMO-1`／`DEMO-2` 提問，請在實際使用的環境檔設定 `SEED_DEMO_DATA=true`；真實設備部署則設為 `false`。正式報表保存在 `backend/outputs`；請讓該目錄可由容器內的 UID 1000 寫入。
 
 如果開發容器正在使用預設連接埠，先停止它們：
 
@@ -510,6 +510,15 @@ curl --fail http://127.0.0.1:5173/api/health
 
 健康檢查應回傳 `{"status":"ok"}`。Web UI 預設位於 <http://localhost:5173>；Swagger 位於 <http://127.0.0.1:8000/docs>。如果修改主機連接埠，請將上述網址一併改成新的連接埠。Dockerfile 的開發與正式 target 分別建置，所以正式映像不依賴主機上的原始碼。
 
+若示範提問顯示找不到 `DEMO-2`，請檢查正式環境檔中的 `SEED_DEMO_DATA`。設為 `true` 後重跑 `./deploy-prod.sh`，後端啟動時會在正式資料庫各建立 120 筆 `DEMO-1`、`DEMO-2` 感測資料。可用以下唯讀查詢確認：
+
+```bash
+docker exec agent-postgres-prod psql -U agent_user -d motor_monitor_db \
+  -c "SELECT motor_id, COUNT(*) FROM motor_sensor_data WHERE motor_id IN ('DEMO-1', 'DEMO-2') GROUP BY motor_id ORDER BY motor_id;"
+```
+
+開發與正式資料庫使用不同的 volume，因此開發環境已建立的示範資料不會自動出現在正式環境。把 `SEED_DEMO_DATA` 改回 `false` 只會停止後續自動建立或更新，不會刪除現有示範資料。
+
 ### 常用維運指令
 
 ```bash
@@ -518,7 +527,7 @@ docker logs --tail=200 --follow agent-fastapi-prod
 docker logs --tail=100 agent-postgres-prod
 docker logs --tail=100 agent-frontend-prod
 
-# 程式碼或 .env 變更後重新建置並部署
+# 程式碼或環境檔變更後重新建置並部署
 ./deploy-prod.sh
 
 # 停止正式服務，保留資料庫 volume 與報表

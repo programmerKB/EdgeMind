@@ -13,7 +13,7 @@ const SUGGESTIONS = [
   {
     icon: Activity,
     title: '預測未來溫度',
-    description: '用 DEMO-1 模型推論 DEMO-2 資料',
+    description: '用 DEMO-1 推論 DEMO-2（需啟用示範資料）',
     prompt: '請使用 DEMO-1 訓練的模型，推論設備 DEMO-2 在 30 分鐘後的溫度，並說明模型誤差',
   },
   {

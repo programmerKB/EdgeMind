@@ -60,6 +60,7 @@ POSTGRES_DB=$(read_setting POSTGRES_DB)
 DATABASE_URL=$(read_setting DATABASE_URL)
 GEMINI_API_KEY=$(read_setting GEMINI_API_KEY)
 CORS_ORIGINS=$(read_setting CORS_ORIGINS)
+SEED_DEMO_DATA=$(read_setting SEED_DEMO_DATA)
 APP_PORT=$(read_setting APP_PORT)
 BACKEND_PORT=$(read_setting BACKEND_PORT)
 APP_PORT=${APP_PORT:-5173}
@@ -68,6 +69,11 @@ BACKEND_PORT=${BACKEND_PORT:-8000}
 [[ -n $GEMINI_API_KEY ]] || die '.env 缺少 GEMINI_API_KEY'
 [[ $DATABASE_URL == *'@db:5432/'* ]] || die 'DATABASE_URL 必須連至 Docker 網路中的 db:5432'
 [[ -n $CORS_ORIGINS && $CORS_ORIGINS != '*' ]] || die '正式環境的 CORS_ORIGINS 必須列出允許的來源，不能使用 *'
+case ${SEED_DEMO_DATA,,} in
+  true|1|yes|on) SEED_DEMO_DATA=true ;;
+  false|0|no|off|'') SEED_DEMO_DATA=false ;;
+  *) die 'SEED_DEMO_DATA 必須是 true 或 false' ;;
+esac
 check_port APP_PORT "$APP_PORT"
 check_port BACKEND_PORT "$BACKEND_PORT"
 [[ $APP_PORT != "$BACKEND_PORT" ]] || die 'APP_PORT 與 BACKEND_PORT 不能相同'
@@ -102,7 +108,7 @@ wait_healthy "$DB_NAME"
 
 docker run -d --name "$BACKEND_NAME" --network "$NETWORK" --network-alias backend \
   --restart unless-stopped --env-file "$ENV_FILE" \
-  --env SEED_DEMO_DATA=false --env INFERENCE_OUTPUT_DIR=/app/outputs \
+  --env "SEED_DEMO_DATA=$SEED_DEMO_DATA" --env INFERENCE_OUTPUT_DIR=/app/outputs \
   --publish "127.0.0.1:$BACKEND_PORT:8000" \
   --mount "type=bind,src=$ROOT_DIR/backend/outputs,dst=/app/outputs" \
   edgemind-backend:prod >/dev/null
@@ -114,3 +120,4 @@ docker run -d --name "$FRONTEND_NAME" --network "$NETWORK" \
 wait_healthy "$FRONTEND_NAME"
 
 printf '正式環境已就緒：Web http://localhost:%s；API http://127.0.0.1:%s/docs\n' "$APP_PORT" "$BACKEND_PORT"
+printf '示範資料設定：SEED_DEMO_DATA=%s\n' "$SEED_DEMO_DATA"
