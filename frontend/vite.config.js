@@ -6,7 +6,7 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
-  // Docker resolves the Compose service name; native development reaches the
+  // Docker resolves the network alias; native development reaches the
   // backend through the host loopback address.
   const defaultProxyTarget = existsSync('/.dockerenv')
     ? 'http://backend:8000'
