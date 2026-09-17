@@ -1,4 +1,4 @@
-FROM python:3.11.16-slim-trixie@sha256:9534e5a8e315485d4061ed659af0fd78a284c015f9b73661b41d6bab25604534
+FROM python:3.11.16-slim-trixie@sha256:9534e5a8e315485d4061ed659af0fd78a284c015f9b73661b41d6bab25604534 AS dependencies
 COPY --from=ghcr.io/astral-sh/uv:0.12.13@sha256:b485bd65cc2cf1c9a93b3554012c9c3778cf7b1b5fd3d3096ce9e1226c97e1e6 /uv /bin/uv
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -22,9 +22,22 @@ USER app
 # Install dependencies before source code so Docker can reuse this layer.
 RUN uv pip install -r requirements.txt
 
-# Keep the image runnable without a bind mount; Compose overrides source files
-# and enables reload only for the local development workflow.
+# Development uses a source bind mount and reloads Python code on changes.
+FROM dependencies AS development
+
+HEALTHCHECK --interval=10s --timeout=5s --start-period=20s --retries=12 \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3)"
+
+CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+
+# Production ships application code in the image and only mounts report output.
+FROM dependencies AS production
+
 COPY --chown=app:app . .
 RUN mkdir -p /app/outputs
+
+HEALTHCHECK --interval=10s --timeout=5s --start-period=20s --retries=12 \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3)"
 
 CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

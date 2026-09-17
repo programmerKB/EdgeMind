@@ -39,7 +39,7 @@ EdgeMind 是一套面向工業馬達與邊緣設備的 AI 診斷系統。它整�
 | Agent | Google Gemini、Google Gen AI SDK |
 | 資料庫 | PostgreSQL 16、SQLAlchemy |
 | 預測 | Python 標準函式庫實作的 Ridge Regression |
-| 部署 | Docker、Docker Compose |
+| 部署 | Docker Engine、Bash 部署腳本 |
 
 後端直接依賴已在 [`backend/requirements.txt`](./backend/requirements.txt) 使用 `==` 精確鎖定；前端直接與間接依賴由 [`frontend/package-lock.json`](./frontend/package-lock.json) 鎖定，確保不同環境重建時取得一致版本。
 
@@ -51,13 +51,14 @@ EdgeMind 是一套面向工業馬達與邊緣設備的 AI 診斷系統。它整�
 
 - Git
 - 有效的 Gemini API Key
-- [Docker Desktop](https://docs.docker.com/desktop/)，或 [Docker Engine](https://docs.docker.com/engine/install/) 搭配 [Docker Compose Plugin](https://docs.docker.com/compose/install/)
+- [Docker Desktop](https://docs.docker.com/desktop/)，或 [Docker Engine](https://docs.docker.com/engine/install/)
+- Bash
 
 確認 Docker 可用：
 
 ```bash
 docker --version
-docker compose version
+docker info
 ```
 
 ### 2. 取得專案
@@ -69,7 +70,13 @@ cd Edge-mind
 
 ### 3. 建立環境設定
 
-在專案根目錄建立 `.env`：
+在專案根目錄建立 `.env`，然後修改其中的 API Key 與資料庫密碼：
+
+```bash
+cp .env.example .env
+```
+
+設定範例：
 
 ```dotenv
 GEMINI_API_KEY=你的_Gemini_API_Key
@@ -81,7 +88,7 @@ POSTGRES_PASSWORD=請改成高強度密碼
 POSTGRES_DB=motor_monitor_db
 DATABASE_URL=postgresql://agent_user:請改成高強度密碼@db:5432/motor_monitor_db
 
-# 展示環境使用 true；正式環境應改成 false
+# 開發環境可使用 true；正式部署腳本會強制設為 false
 SEED_DEMO_DATA=true
 
 # 推論輸出與異常判定
@@ -92,17 +99,20 @@ ANOMALY_TEMPERATURE_THRESHOLD=35.0
 # Gemini 單次回應最長等待秒數；主模型忙碌時會有限重試並切換備援模型
 AGENT_RESPONSE_TIMEOUT_SECONDS=60
 
-# 多個來源用逗號分隔；正式環境不要使用 *
-CORS_ORIGINS=*
+# 多個來源用逗號分隔；正式環境不能使用 *
+CORS_ORIGINS=http://localhost:5173
+
+APP_PORT=5173
+BACKEND_PORT=8000
 ```
 
-`POSTGRES_PASSWORD` 必須與 `DATABASE_URL` 中的密碼一致。`.env` 已被 Git 忽略，請勿提交真實 API Key 或密碼。
+`POSTGRES_PASSWORD` 必須與 `DATABASE_URL` 中的密碼一致；若密碼含有 URL 保留字元，請在 `DATABASE_URL` 中做百分比編碼。設定檔使用 `KEY=value`，不要在值外加引號或空白。開發腳本優先讀取 `.env.dev`，正式腳本優先讀取 `.env.prod`；若各自的檔案不存在，則讀取 `.env`。這些設定檔都已被 Git 忽略，請勿提交真實 API Key 或密碼。
 
 ### 4. 啟動服務
 
 ```bash
-docker compose up -d --build
-docker compose ps
+./deploy-dev.sh
+docker ps --filter name=agent-
 ```
 
 服務入口：
@@ -111,13 +121,13 @@ docker compose ps
 - Swagger API：<http://localhost:8000/docs>
 - Backend：<http://localhost:8000>
 
-開發模式的 PostgreSQL `5432` 與後端 `8000` 只綁定主機的 `127.0.0.1`；前端 `5173` 保持對外綁定，方便 Windows 主機或區域網路裝置連入 VM，並由前端代理 `/api` 請求。
+開發模式的 PostgreSQL `5432` 與後端 `BACKEND_PORT` 只綁定主機的 `127.0.0.1`；前端 `APP_PORT` 綁定所有介面，方便區域網路裝置連入，並由前端代理 `/api` 請求。
 
 若服務未正常啟動：
 
 ```bash
-docker compose logs --tail=100 backend
-docker compose logs --tail=100 frontend
+docker logs --tail=100 agent-fastapi
+docker logs --tail=100 agent-frontend
 ```
 
 ## 使用方式
@@ -235,7 +245,8 @@ bootstrap 是唯一可以同時組裝所有層的 composition root
 │   │   └── services/           # SSE API 與增量資料解析
 │   ├── package.json
 │   └── package-lock.json
-├── docker-compose.yml
+├── deploy-dev.sh              # 開發容器建置與啟動
+├── deploy-prod.sh             # 正式容器建置與啟動
 └── README.md
 ```
 
@@ -404,7 +415,7 @@ Docker 與 Python 虛擬環境是兩種不同的執行方式，**不需要同時
 
 | 執行方式 | 適用情境 | 需要準備 |
 | --- | --- | --- |
-| Docker（建議） | 啟動完整的前端、後端與 PostgreSQL | Docker 與 Docker Compose；不需要在主機建立 `.venv` |
+| Docker（建議） | 啟動完整的前端、後端與 PostgreSQL | Docker、Bash；不需要在主機建立 `.venv` |
 | 主機上的 Python 虛擬環境 | 單獨開發、測試或除錯後端 | Python 3.11、`.venv`，以及可連線的 PostgreSQL |
 
 Docker 映像會直接把 Python 套件安裝在隔離的容器內，因此使用上方「快速啟動」流程時，不必另外建立虛擬環境。若 IDE 需要在主機上解析套件，或要直接從主機執行後端，才需要建立 `.venv`；兩者可以共存，但不是必要條件。
@@ -430,7 +441,7 @@ PYTHONPYCACHEPREFIX=/tmp/edgemind-pycache python -m compileall -q .
 若使用 Docker，則可在後端容器中執行測試：
 
 ```bash
-docker compose exec backend python -m unittest discover -s tests -v
+docker exec agent-fastapi python -m unittest discover -s tests -v
 ```
 
 ### Agent 基準測試
@@ -467,181 +478,107 @@ npm run dev
 
 ## 部署與維運
 
-### 使用 Docker Compose 正式部署
+### 兩種部署腳本
 
-正式模式使用非 root Nginx 提供靜態前端、以非 root 且不含 `--reload` 的 Uvicorn 執行 FastAPI，並為 PostgreSQL 與後端設定健康檢查。PostgreSQL 不會公開主機連接埠，後端預設只綁定主機的 `127.0.0.1:8000`。
+| 環境 | 啟動指令 | 容器 | PostgreSQL volume | 程式碼來源 |
+| --- | --- | --- | --- | --- |
+| 開發 | `./deploy-dev.sh` | `agent-postgres`、`agent-fastapi`、`agent-frontend` | `my_agent_project_postgres_dev_data` | 前後端原始碼掛載；Uvicorn 與 Vite 自動重載 |
+| 正式 | `./deploy-prod.sh` | `agent-postgres-prod`、`agent-fastapi-prod`、`agent-frontend-prod` | `my_agent_project_postgres_prod_data` | 已建置映像；Nginx 提供靜態檔案 |
 
-第一次部署前，建立環境設定：
+兩支腳本逐條執行 `docker build`、`docker network`、`docker volume`、`docker run` 等指令，建立獨立網路與資料 volume、啟動三個容器，並等待資料庫、後端、前端健康檢查通過。重跑腳本會先建置新映像，再更新該環境的容器；資料庫 named volume 與 `backend/outputs` 不會刪除。正式環境後端以非 root 身分執行，停用自動重載，且強制 `SEED_DEMO_DATA=false`。
+
+兩個環境預設使用相同的主機連接埠：前端 `5173`、後端 `8000`。切換環境前，先停止另一環境的容器；或在對應的環境檔改用未被占用的 `APP_PORT`、`BACKEND_PORT`。開發資料庫另佔主機 `127.0.0.1:5432`。正式資料庫只在容器網路上提供服務；兩個環境都只把後端連接埠綁定在主機 `127.0.0.1`，前端連接埠則可由區域網路存取。
+
+### 正式部署
+
+依[快速啟動](#快速啟動)建立 `.env`，或以 `cp .env.example .env.prod` 為正式環境建立獨立設定；確認 `DATABASE_URL` 的主機是 `db:5432`、資料庫密碼與 `POSTGRES_PASSWORD` 相同，且 `CORS_ORIGINS` 為明確來源而非 `*`。正式報表保存在 `backend/outputs`；請讓該目錄可由容器內的 UID 1000 寫入。
+
+如果開發容器正在使用預設連接埠，先停止它們：
 
 ```bash
-cp .env.example .env
-# 編輯 .env，填入 Gemini API Key、資料庫密碼，
-# 並確認 DATABASE_URL 使用相同密碼與 db:5432。
+docker rm -f agent-frontend agent-fastapi agent-postgres
 ```
 
-先確認 Compose 設定正確：
+部署並檢查服務：
 
 ```bash
-docker compose --profile production config --quiet
-```
-
-開發與正式模式會使用相同的主機連接埠，因此切換模式前先停止目前的容器。這個指令會保留 PostgreSQL named volume 與 `backend/outputs`：
-
-```bash
-docker compose --profile production down
-```
-
-建置並啟動正式環境：
-
-```bash
-docker compose --profile production up -d \
-  --build \
-  --remove-orphans \
-  db-prod backend-prod frontend-prod
-```
-
-必須明確列出這三個 production 服務；若省略服務名稱，Compose 也會選入預設的開發服務，造成主機連接埠衝突。
-
-開發與正式 PostgreSQL 分別使用 `postgres_dev_data` 與 `postgres_prod_data`，不會掛載同一份資料目錄。若專案曾使用舊版共用的 `postgres_data`，請先依下方「舊版資料 volume 遷移」完成遷移，再啟動更新後的服務。
-
-檢查容器與服務健康狀態：
-
-```bash
-docker compose --profile production ps
+./deploy-prod.sh
+docker ps --filter name=agent-
 curl --fail http://127.0.0.1:8000/api/health
 curl --fail http://127.0.0.1:5173/api/health
 ```
 
-兩個健康檢查正常時都會回傳 `{"status":"ok"}`。Web UI 預設位於 <http://localhost:5173>；可在 `.env` 以 `APP_PORT` 與 `BACKEND_PORT` 修改主機端連接埠，修改後也要將上述檢查網址換成對應的連接埠。
+健康檢查應回傳 `{"status":"ok"}`。Web UI 預設位於 <http://localhost:5173>；Swagger 位於 <http://127.0.0.1:8000/docs>。如果修改主機連接埠，請將上述網址一併改成新的連接埠。Dockerfile 的開發與正式 target 分別建置，所以正式映像不依賴主機上的原始碼。
 
-正式環境的常用維運指令：
-
-```bash
-# 查看日誌
-docker compose --profile production logs --tail=200 --follow \
-  db-prod backend-prod frontend-prod
-
-# 重新建置並套用前後端程式
-docker compose --profile production up -d --build \
-  backend-prod frontend-prod
-
-# 重啟前後端
-docker compose --profile production restart backend-prod frontend-prod
-
-# 停止服務並保留資料
-docker compose --profile production down
-```
-
-若要切回開發模式，停止正式環境後啟動預設服務：
+### 常用維運指令
 
 ```bash
-docker compose --profile production down
-docker compose up -d --build
+# 正式環境日誌
+docker logs --tail=200 --follow agent-fastapi-prod
+docker logs --tail=100 agent-postgres-prod
+docker logs --tail=100 agent-frontend-prod
+
+# 程式碼或 .env 變更後重新建置並部署
+./deploy-prod.sh
+
+# 停止正式服務，保留資料庫 volume 與報表
+docker rm -f agent-frontend-prod agent-fastapi-prod agent-postgres-prod
+
+# 切回開發環境
+./deploy-dev.sh
 ```
+
+重跑部署腳本會短暫中斷該環境服務；映像建置在容器更新前完成。`docker rm -f -v` 只會清理容器的匿名 volume；資料庫使用具名 volume。不要使用 `docker volume rm` 清除資料庫，除非已完成備份且確定要刪除資料。
+
+原有的 `my_agent_project_postgres_dev_data` 與 `my_agent_project_postgres_prod_data` 會直接沿用。若舊容器仍占用連接埠，先用 `docker ps` 找出並以 `docker rm -f <容器名稱>` 停止；移除容器不會刪除具名 volume。
 
 ### 區域網路存取
 
-Production 的 Nginx（開發模式則為 Vite）會將 `/api` 代理到後端。區域網路裝置可直接開啟：
-
-```text
-http://192.168.1.50:5173
-```
-
-請換成部署主機 IP，並允許 TCP 5173。只有前端與 API 位於不同來源時，才需要建立 `frontend/.env.local`：
-
-```dotenv
-VITE_API_URL=http://192.168.1.50:8000/api/chat_utf8
-```
-
-這種分離部署模式也必須允許 API 連接埠。行動裝置中的 `127.0.0.1` 指向裝置本身，不是部署主機。
+正式環境由 Nginx、開發環境由 Vite 將 `/api` 代理到後端。在同一區域網路中，開啟 `http://192.168.1.50:5173`，並將 IP 換成部署主機的實際位址；主機防火牆需允許 `APP_PORT`。如果在前端設了自訂 `VITE_API_URL`，請確認該 URL 可由瀏覽器所在裝置存取；預設相對路徑可直接使用同源代理。
 
 ### 查看資料庫
 
-開發模式：
-
 ```bash
-docker compose exec db psql -U agent_user -d motor_monitor_db
+# 開發環境
+docker exec -it agent-postgres psql -U agent_user -d motor_monitor_db
+
+# 正式環境
+docker exec -it agent-postgres-prod psql -U agent_user -d motor_monitor_db
 ```
 
-正式模式：
-
-```bash
-docker compose --profile production exec db-prod \
-  psql -U agent_user -d motor_monitor_db
-```
-
-```sql
-SELECT
-    motor_id,
-    COUNT(*) AS reading_count,
-    MIN(recorded_at) AS first_record,
-    MAX(recorded_at) AS latest_record
-FROM motor_sensor_data
-GROUP BY motor_id
-ORDER BY motor_id;
-```
-
-輸入 `\q` 離開 PostgreSQL。
-
-### 舊版資料 volume 遷移
-
-只有從仍使用 `postgres_data` 的舊版設定升級時才需要執行一次。先停止服務，以唯讀方式掛載舊 volume，並將內容複製到新的開發 volume：
-
-```bash
-docker compose down
-docker compose create db
-docker run --rm \
-  --mount type=volume,src=my_agent_project_postgres_data,dst=/source,readonly \
-  --mount type=volume,src=my_agent_project_postgres_dev_data,dst=/target \
-  alpine:3.24@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b \
-  sh -c 'cp -a /source/. /target/'
-docker compose up -d --build
-```
-
-確認開發資料完整後，再自行移除舊的 `my_agent_project_postgres_data`。不要把舊 volume 複製到 `postgres_prod_data` 當作正式資料；正式資料應從經過確認的備份還原。
+若環境檔使用其他帳號或資料庫名稱，請替換指令中的 `-U` 與 `-d` 值。輸入 `\q` 離開 PostgreSQL。
 
 ### 備份與還原
 
-備份：
+先在維護時段備份正式資料庫，再保存 `backend/outputs` 中的報表：
 
 ```bash
-docker compose --profile production exec -T db-prod \
-  pg_dump -U agent_user motor_monitor_db > motor_monitor_backup.sql
+docker exec agent-postgres-prod pg_dump -U agent_user motor_monitor_db > motor_monitor_backup.sql
 ```
 
-還原：
+還原 SQL 備份時：
 
 ```bash
-docker compose --profile production exec -T db-prod \
-  psql -U agent_user -d motor_monitor_db < motor_monitor_backup.sql
+docker exec -i agent-postgres-prod psql -U agent_user -d motor_monitor_db < motor_monitor_backup.sql
 ```
 
-`docker compose --profile production down` 不會刪除 PostgreSQL volume。不要加上 `-v` 當成一般重啟；`docker compose down -v` 會刪除開發與正式環境各自的資料庫 volume。
+資料庫使用獨立具名 volume；開發與正式環境不共用資料。請定期驗證備份能夠還原。
 
-### 正式部署基線
+### 對外部署前
 
-目前 Compose 適合開發、展示與可信任內網。公開部署前至少應：
-
-- 設定 `SEED_DEMO_DATA=false`。
-- 將 CORS 限制為實際前端網域。
-- 前端使用 production build 與正式 Web Server。
-- 後端停用 Uvicorn `--reload`。
-- 不對外公開 PostgreSQL 5432。
-- 定期更新並重新鎖定 Docker 基礎映像的版本與 digest，以取得安全修補。
-- 啟用 HTTPS、登入、授權與 rate limit。
-- 使用 secret manager 保存 API Key 與資料庫密碼。
-- 加入健康檢查、監控、告警、自動備份與還原演練。
-- 使用真實設備資料重新訓練，並制定可接受的誤差與告警門檻。
+部署腳本提供容器、健康檢查與資料持久化。若要對公網開放，還需配置 HTTPS、身分驗證、授權、流量限制、監控與自動備份，並用真實設備資料驗證模型表現。API Key 與密碼應交由主機的秘密管理方案保管；部署主機上的 `.env` 不應提交到版本控制。
 
 ## 常見問題
 
 ### 網頁無法開啟
 
 ```bash
-docker compose ps
-docker compose logs --tail=100 frontend
+docker ps --filter name=agent-
+docker logs --tail=100 agent-frontend
 curl -I http://127.0.0.1:5173
 ```
+
+正式環境請將上方容器名稱改為 `agent-frontend-prod`；若調整 `APP_PORT`，也要更換檢查網址的連接埠。
 
 ### 前端顯示「伺服器回應錯誤」或 Failed to fetch
 
@@ -657,8 +594,10 @@ curl -i http://127.0.0.1:8000/api/performance/summary
 ### Agent 沒有回應
 
 ```bash
-docker compose logs --tail=200 backend
+docker logs --tail=200 agent-fastapi
 ```
+
+正式環境的後端容器名稱為 `agent-fastapi-prod`。
 
 確認 `GEMINI_API_KEY` 有效、`GEMINI_MODEL_ID` 可由該帳號使用，且主機能連線 Google API。模型超過預設 60 秒未回應時會回傳錯誤，可調整 `AGENT_RESPONSE_TIMEOUT_SECONDS`。
 
@@ -667,8 +606,10 @@ docker compose logs --tail=200 backend
 Docker 中的後端應使用 `db:5432`；直接在主機執行後端時才使用 `127.0.0.1:5432`。
 
 ```bash
-docker compose logs --tail=100 db
+docker logs --tail=100 agent-postgres
 ```
+
+正式環境的資料庫容器名稱為 `agent-postgres-prod`。
 
 ### Docker 權限不足
 
