@@ -204,7 +204,7 @@ flowchart LR
     ADAPTER -->|Google Gen AI SDK| GEMINI
 ```
 
-感測設備目前沒有內建 MQTT、Modbus 或其他設備通訊客戶端；資料需由外部程式經 `/api` 代理呼叫 `POST /api/sensor-readings` 寫入。Ridge 訓練、推論與評估在後端執行，PostgreSQL 儲存感測紀錄與模型，報表則寫入 `backend/outputs`。Gemini 是系統外部的模型服務，負責 Agent 的工具決策與文字摘要，不執行 Ridge 數值預測。
+感測設備目前沒有內建 MQTT、Modbus 或其他設備通訊客戶端；資料需由外部程式經 `/api` 代理呼叫 `POST /api/sensor-readings` 寫入。Ridge 訓練、推論與評估在後端執行，PostgreSQL 儲存感測紀錄、模型與聊天紀錄，報表則寫入 `backend/outputs`。Gemini 是系統外部的模型服務，負責 Agent 的工具決策與文字摘要，不執行 Ridge 數值預測。
 
 後端不是只依資料夾分類，而是以 application-owned ports 保持單向依賴：
 
@@ -383,7 +383,7 @@ REST 預測回應會包含 `attachments`；聊天流程則以 `status: "artifact
 | --- | --- | --- |
 | GET | `/api/health` | 檢查 API 與感測資料庫是否就緒 |
 | POST | `/api/chat_utf8` | Gemini Agent SSE 聊天 |
-| GET / POST | `/api/conversations` | 列出或建立目前瀏覽器的診斷對話 |
+| GET / POST | `/api/conversations` | 列出或建立共用的診斷對話 |
 | GET | `/api/conversations/{id}` | 讀取一段對話的完整訊息 |
 | POST | `/api/sensor-readings` | 寫入完整感測資料 |
 | POST | `/api/predictions/train/{motor_id}` | 訓練並保存設備模型 |
@@ -395,9 +395,9 @@ REST 預測回應會包含 `attachments`；聊天流程則以 `status: "artifact
 
 ### 聊天紀錄
 
-前端第一次送出訊息時建立對話，之後在 `POST /api/chat_utf8` 的 JSON 中傳入 `conversation_id`，並以 `X-Client-ID` 標頭帶入瀏覽器產生的 UUID。後端會把使用者訊息及每個 Agent 串流事件（包含報表附件與 Token 用量）寫入 PostgreSQL 的 `chat_conversations`、`chat_messages` 資料表。頁面重新整理後會重新載入上次開啟的對話；側欄可切換舊對話。既有未提供 `conversation_id` 的 API 呼叫仍可聊天，但不會建立紀錄。
+前端第一次送出訊息時建立對話，之後在 `POST /api/chat_utf8` 的 JSON 中傳入 `conversation_id`。後端會把使用者訊息及每個 Agent 串流事件（包含報表附件與 Token 用量）寫入 PostgreSQL 的 `chat_conversations`、`chat_messages` 資料表。每次開啟或重新整理網頁都先顯示歡迎畫面，舊對話可從側欄開啟。既有未提供 `conversation_id` 的 API 呼叫仍可聊天，但不會建立紀錄。
 
-此識別碼保存在瀏覽器的 localStorage，沒有登入與跨裝置同步。清除瀏覽器儲存空間後，原識別碼無法由介面取回，原紀錄仍留在資料庫；若要提供多人帳號或更嚴格的存取控制，須另外整合身分驗證。
+聊天紀錄在同一部署中共用；Chrome、Edge 與其他能開啟網站的瀏覽器都能看到全部對話。舊版以瀏覽器 UUID 建立的紀錄也會出現在共用清單中。此功能沒有登入或存取控制，請只在適合共用聊天內容的環境中使用。
 
 聊天的最終 `status: "success"` SSE 事件會包含 `token_usage`：
 

@@ -1,4 +1,4 @@
-"""SQLAlchemy adapter for browser-scoped conversations and chat messages."""
+"""SQLAlchemy adapter for shared conversations and chat messages."""
 
 from uuid import uuid4
 
@@ -10,6 +10,10 @@ from edgemind.infrastructure.persistence.models import (
     ChatMessageRow,
     utc_now,
 )
+
+# Existing rows retain their browser UUIDs; new rows use this shared marker.
+# Reads intentionally ignore owner_id so earlier histories remain visible.
+SHARED_OWNER_ID = "shared"
 
 
 def _conversation(row: ChatConversationRow) -> ChatConversation:
@@ -29,39 +33,33 @@ def _message(row: ChatMessageRow) -> ChatMessage:
 
 
 class SqlAlchemyChatRepository:
-    """Keep ownership checks close to every conversation lookup."""
+    """Store one timeline shared by everyone using this deployment."""
 
     def __init__(self, session: Session):
         self._session = session
 
-    def list_conversations(self, owner_id: str) -> list[ChatConversation]:
+    def list_conversations(self) -> list[ChatConversation]:
         rows = (
             self._session.query(ChatConversationRow)
-            .filter(ChatConversationRow.owner_id == owner_id)
             .order_by(ChatConversationRow.updated_at.desc(), ChatConversationRow.id.desc())
             .all()
         )
         return [_conversation(row) for row in rows]
 
-    def create_conversation(self, owner_id: str, title: str) -> ChatConversation:
+    def create_conversation(self, title: str) -> ChatConversation:
         now = utc_now()
         row = ChatConversationRow(
-            id=str(uuid4()), owner_id=owner_id, title=title,
+            id=str(uuid4()), owner_id=SHARED_OWNER_ID, title=title,
             created_at=now, updated_at=now,
         )
         self._session.add(row)
         self._session.flush()
         return _conversation(row)
 
-    def get_conversation(
-        self, owner_id: str, conversation_id: str,
-    ) -> ChatConversation | None:
+    def get_conversation(self, conversation_id: str) -> ChatConversation | None:
         row = (
             self._session.query(ChatConversationRow)
-            .filter(
-                ChatConversationRow.id == conversation_id,
-                ChatConversationRow.owner_id == owner_id,
-            )
+            .filter(ChatConversationRow.id == conversation_id)
             .first()
         )
         return _conversation(row) if row is not None else None

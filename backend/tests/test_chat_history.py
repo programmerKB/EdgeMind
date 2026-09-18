@@ -14,7 +14,11 @@ from sqlalchemy.pool import StaticPool
 from edgemind.application.agent import AgentEvent, TokenUsage
 from edgemind.application.chat_history import ChatHistoryService
 from edgemind.infrastructure.persistence.database import Base
-from edgemind.infrastructure.persistence.models import ChatConversationRow, ChatMessageRow
+from edgemind.infrastructure.persistence.models import (
+    ChatConversationRow,
+    ChatMessageRow,
+    utc_now,
+)
 from edgemind.infrastructure.persistence.unit_of_work import SqlAlchemyUnitOfWork
 from edgemind.presentation.api.routes import chat, conversations
 
@@ -50,30 +54,24 @@ class ChatHistoryTests(unittest.TestCase):
         app.include_router(chat.create_router(FakeAgent(), history, factory))
         self.client = TestClient(app)
         self.owner = str(uuid4())
-        self.other_owner = str(uuid4())
         self.addCleanup(self.client.close)
         self.addCleanup(self.engine.dispose)
-
-    def headers(self, owner=None):
-        return {"X-Client-ID": owner or self.owner}
 
     def test_create_stream_and_reload_complete_timeline(self):
         created_response = self.client.post(
             "/api/conversations",
-            headers=self.headers(),
             json={"title": "M1 狀態如何？"},
         )
         self.assertEqual(created_response.status_code, 201)
         created = created_response.json()
         self.assertEqual(created["title"], "M1 狀態如何？")
         self.assertEqual(
-            self.client.get("/api/conversations", headers=self.headers()).json()[0]["id"],
+            self.client.get("/api/conversations").json()[0]["id"],
             created["id"],
         )
 
         response = self.client.post(
             "/api/chat_utf8",
-            headers=self.headers(),
             json={"conversation_id": created["id"], "message": "M1 狀態如何？"},
         )
         self.assertEqual(response.status_code, 200)
@@ -86,9 +84,7 @@ class ChatHistoryTests(unittest.TestCase):
             ["thought", "artifacts", "success"],
         )
 
-        reloaded = self.client.get(
-            "/api/conversations/" + created["id"], headers=self.headers(),
-        )
+        reloaded = self.client.get("/api/conversations/" + created["id"])
         self.assertEqual(reloaded.status_code, 200)
         messages = reloaded.json()["messages"]
         self.assertEqual(
@@ -99,40 +95,58 @@ class ChatHistoryTests(unittest.TestCase):
         self.assertEqual(messages[2]["attachments"][0]["label"], "圖表")
         self.assertEqual(messages[3]["token_usage"]["total_tokens"], 8)
 
-    def test_owner_isolation_and_missing_owner_header(self):
+    def test_old_browser_histories_and_new_chats_are_shared(self):
+        legacy_id = str(uuid4())
+        second_legacy_id = str(uuid4())
+        now = utc_now()
+        with self.engine.begin() as connection:
+            connection.execute(
+                ChatConversationRow.__table__.insert(),
+                [
+                    {
+                        "id": legacy_id, "owner_id": self.owner,
+                        "title": "Chrome 舊紀錄",
+                        "created_at": now, "updated_at": now,
+                    },
+                    {
+                        "id": second_legacy_id, "owner_id": str(uuid4()),
+                        "title": "Edge 舊紀錄",
+                        "created_at": now, "updated_at": now,
+                    },
+                ],
+            )
+
         created = self.client.post(
-            "/api/conversations", headers=self.headers(), json={"title": "私有紀錄"},
+            "/api/conversations", json={"title": "新的共用紀錄"},
         ).json()
+        listed = self.client.get(
+            "/api/conversations",
+            headers={"X-Client-ID": str(uuid4())},
+        )
+        self.assertEqual(listed.status_code, 200)
         self.assertEqual(
-            self.client.get("/api/conversations", headers=self.headers(self.other_owner)).json(),
-            [],
+            {item["id"] for item in listed.json()},
+            {legacy_id, second_legacy_id, created["id"]},
         )
         self.assertEqual(
-            self.client.get(
-                "/api/conversations/" + created["id"],
-                headers=self.headers(self.other_owner),
-            ).status_code,
+            self.client.get("/api/conversations/" + legacy_id).json()["title"],
+            "Chrome 舊紀錄",
+        )
+        self.assertEqual(
+            self.client.get("/api/conversations/" + second_legacy_id).json()["title"],
+            "Edge 舊紀錄",
+        )
+        response = self.client.post(
+            "/api/chat_utf8",
+            json={"conversation_id": legacy_id, "message": "繼續舊對話"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            self.client.get("/api/conversations/" + legacy_id)
+            .json()["messages"][0]["content"],
+            "繼續舊對話",
+        )
+        self.assertEqual(
+            self.client.get("/api/conversations/" + str(uuid4())).status_code,
             404,
-        )
-        self.assertEqual(
-            self.client.post(
-                "/api/chat_utf8",
-                headers=self.headers(self.other_owner),
-                json={"conversation_id": created["id"], "message": "偷看"},
-            ).status_code,
-            404,
-        )
-        self.assertEqual(self.client.get("/api/conversations").status_code, 422)
-        self.assertEqual(
-            self.client.post(
-                "/api/chat_utf8",
-                json={"conversation_id": created["id"], "message": "漏了識別碼"},
-            ).status_code,
-            422,
-        )
-        self.assertEqual(
-            self.client.get(
-                "/api/conversations/" + created["id"], headers=self.headers(),
-            ).json()["messages"],
-            [],
         )

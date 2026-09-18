@@ -14,28 +14,23 @@ import {
 } from '../services/chatApi.js';
 import { createId } from '../utils/createId.js';
 
-const ACTIVE_CHAT_KEY = 'edgemind.activeChat.v1';
-
-function rememberActiveChat(id) {
-  try {
-    window.localStorage.setItem(ACTIVE_CHAT_KEY, id || 'new');
-  } catch {
-    // The in-memory selection still works if storage is unavailable.
-  }
-}
-
-function savedActiveChat() {
-  try {
-    return window.localStorage.getItem(ACTIVE_CHAT_KEY);
-  } catch {
-    return null;
-  }
-}
-
 function readableError(error) {
   return error.message === 'Failed to fetch'
     ? '目前無法連線至診斷服務，請確認後端已啟動。'
     : error.message;
+}
+
+function mergeConversations(previous, incoming) {
+  const byId = new Map(previous.map((item) => [item.id, item]));
+  for (const item of incoming) {
+    const stored = byId.get(item.id);
+    if (!stored || Date.parse(item.updated_at) >= Date.parse(stored.updated_at)) {
+      byId.set(item.id, item);
+    }
+  }
+  return [...byId.values()].sort(
+    (a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at),
+  );
 }
 
 export function useChat(inferenceModel = 'ridge_direct') {
@@ -61,26 +56,10 @@ export function useChat(inferenceModel = 'ridge_direct') {
         const items = await listConversations({ signal: controller.signal });
         if (!mountedRef.current) return;
         if (version !== selectionVersionRef.current) {
-          setConversations((previous) => {
-            const known = new Set(previous.map((item) => item.id));
-            return [...previous, ...items.filter((item) => !known.has(item.id))]
-              .sort((a, b) => b.updated_at.localeCompare(a.updated_at));
-          });
+          setConversations((previous) => mergeConversations(previous, items));
           return;
         }
         setConversations(items);
-        const remembered = savedActiveChat();
-        const chosen = remembered === 'new'
-          ? null
-          : items.find((item) => item.id === remembered)?.id || items[0]?.id;
-        if (chosen) {
-          const conversation = await getConversation(chosen, { signal: controller.signal });
-          if (!mountedRef.current || version !== selectionVersionRef.current) return;
-          currentConversationRef.current = chosen;
-          setConversationId(chosen);
-          setMessages(conversation.messages.map(restoreMessage));
-          rememberActiveChat(chosen);
-        }
         setHistoryError('');
       } catch (error) {
         if (error.name !== 'AbortError' && mountedRef.current
@@ -103,6 +82,59 @@ export function useChat(inferenceModel = 'ridge_direct') {
     };
   }, []);
 
+  useEffect(() => {
+    if (!historyReady) return undefined;
+    let cancelled = false;
+    let refreshing = false;
+
+    async function refreshHistory() {
+      if (refreshing || !mountedRef.current) return;
+      refreshing = true;
+      const version = selectionVersionRef.current;
+      try {
+        const items = await listConversations();
+        if (cancelled || !mountedRef.current) return;
+        setConversations((previous) => mergeConversations(previous, items));
+        setHistoryError('');
+        const activeId = currentConversationRef.current;
+        if (!activeId || activeRequestRef.current || version !== selectionVersionRef.current) {
+          return;
+        }
+        const conversation = await getConversation(activeId);
+        if (cancelled || !mountedRef.current || activeRequestRef.current
+          || activeId !== currentConversationRef.current
+          || version !== selectionVersionRef.current) return;
+        const restored = conversation.messages.map(restoreMessage);
+        setMessages((previous) => (
+          previous.length === restored.length
+          && previous.every((item, index) => (
+            item.id === restored[index].id
+            && item.content === restored[index].content
+          ))
+            ? previous : restored
+        ));
+        setHistoryError('');
+      } catch (error) {
+        if (!cancelled && mountedRef.current) {
+          setHistoryError('更新聊天紀錄失敗：' + readableError(error));
+        }
+      } finally {
+        refreshing = false;
+      }
+    }
+
+    function onVisibilityChange() {
+      if (document.visibilityState === 'visible') refreshHistory();
+    }
+    window.addEventListener('focus', refreshHistory);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', refreshHistory);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [historyReady]);
+
   const lastUserMessage = useMemo(
     () => findLastUserMessage(messages),
     [messages],
@@ -123,7 +155,6 @@ export function useChat(inferenceModel = 'ridge_direct') {
     setInput('');
     setHistoryReady(true);
     setHistoryError('');
-    rememberActiveChat(null);
   }, [stopResponse]);
 
   const openChat = useCallback(async (id) => {
@@ -139,7 +170,6 @@ export function useChat(inferenceModel = 'ridge_direct') {
       setConversationId(id);
       setMessages(conversation.messages.map(restoreMessage));
       setInput('');
-      rememberActiveChat(id);
     } catch (error) {
       if (mountedRef.current && version === selectionVersionRef.current) {
         setHistoryError('載入聊天紀錄失敗：' + readableError(error));
@@ -170,8 +200,7 @@ export function useChat(inferenceModel = 'ridge_direct') {
         targetId = created.id;
         currentConversationRef.current = targetId;
         setConversationId(targetId);
-        setConversations((previous) => [created, ...previous]);
-        rememberActiveChat(targetId);
+        setConversations((previous) => mergeConversations(previous, [created]));
       }
 
       setHistoryError('');

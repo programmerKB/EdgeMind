@@ -4,9 +4,8 @@ import asyncio
 from dataclasses import asdict
 import logging
 from typing import Callable
-from uuid import UUID
 
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
 from edgemind.application.agent import AgentEvent, AgentService
@@ -27,22 +26,17 @@ def create_router(
     """Create chat routes bound to the Agent application service."""
     router = APIRouter(prefix="/api", tags=["agent"])
 
-    async def stream(
-        request: ChatRequest, client_id: UUID | None, *, ensure_ascii: bool,
-    ) -> StreamingResponse:
+    async def stream(request: ChatRequest, *, ensure_ascii: bool) -> StreamingResponse:
         """Adapt application events to a non-buffered SSE response."""
 
         conversation_id = (
             str(request.conversation_id) if request.conversation_id else None
         )
-        if conversation_id and client_id is None:
-            raise HTTPException(status_code=422, detail="缺少 X-Client-ID")
-
         if conversation_id:
             def save_user_message():
                 with uow_factory() as uow:
                     history.append_message(
-                        uow, str(client_id), conversation_id,
+                        uow, conversation_id,
                         role="user", content=request.message,
                     )
 
@@ -61,7 +55,7 @@ def create_router(
                     def save_event():
                         with uow_factory() as uow:
                             history.append_message(
-                                uow, str(client_id), conversation_id,
+                                uow, conversation_id,
                                 role="agent", content=event.content,
                                 status=event.status,
                                 attachments=event.attachments,
@@ -92,19 +86,13 @@ def create_router(
         )
 
     @router.post("/chat")
-    async def chat_with_agent(
-        request: ChatRequest,
-        client_id: UUID | None = Header(default=None, alias="X-Client-ID"),
-    ):
+    async def chat_with_agent(request: ChatRequest):
         """Stream an ASCII-escaped response for legacy clients."""
-        return await stream(request, client_id, ensure_ascii=True)
+        return await stream(request, ensure_ascii=True)
 
     @router.post("/chat_utf8")
-    async def chat_with_agent_utf8(
-        request: ChatRequest,
-        client_id: UUID | None = Header(default=None, alias="X-Client-ID"),
-    ):
+    async def chat_with_agent_utf8(request: ChatRequest):
         """Stream native UTF-8 events for the React client."""
-        return await stream(request, client_id, ensure_ascii=False)
+        return await stream(request, ensure_ascii=False)
 
     return router

@@ -24,7 +24,7 @@ class SensorReading:
 
 @dataclass(frozen=True, slots=True)
 class ChatConversation:
-    """One browser-scoped conversation summary."""
+    """One shared conversation summary."""
 
     id: str
     title: str

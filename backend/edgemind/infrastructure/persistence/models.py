@@ -56,7 +56,7 @@ def utc_now() -> datetime:
 
 
 class ChatConversationRow(Base):
-    """Conversation metadata scoped to a browser's anonymous identifier."""
+    """Conversation metadata shared across browser sessions."""
 
     __tablename__ = "chat_conversations"
     __table_args__ = (
@@ -64,6 +64,7 @@ class ChatConversationRow(Base):
     )
 
     id = Column(String(36), primary_key=True)
+    # Keep the existing column so old PostgreSQL volumes need no table rewrite.
     owner_id = Column(String(36), nullable=False)
     title = Column(String(100), nullable=False)
     created_at = Column(DateTime(timezone=True), nullable=False, default=utc_now)
