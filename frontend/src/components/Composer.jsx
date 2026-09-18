@@ -9,6 +9,7 @@ export default function Composer({
   onChange,
   onSend,
   isLoading,
+  disabled = false,
   onStop,
   compact = false,
 }) {
@@ -42,6 +43,7 @@ export default function Composer({
           rows={1}
           onChange={(event) => onChange(event.target.value)}
           onKeyDown={handleKeyDown}
+          disabled={disabled}
           placeholder="詢問設備狀態、異常原因或維護建議…"
           aria-label="輸入診斷問題"
         />
@@ -57,7 +59,7 @@ export default function Composer({
           <button
             className="send-button"
             onClick={() => onSend()}
-            disabled={!value.trim()}
+            disabled={disabled || !value.trim()}
             aria-label="傳送訊息"
           >
             <SendHorizontal size={18} />

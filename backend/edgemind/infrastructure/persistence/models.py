@@ -4,7 +4,9 @@ Models describe storage only; querying and orchestration live in repositories
 and services so HTTP handlers do not accumulate database rules.
 """
 
-from sqlalchemy import Column, DateTime, Float, Index, Integer, String, Text
+from datetime import datetime, timezone
+
+from sqlalchemy import Column, DateTime, Float, ForeignKey, Index, Integer, JSON, String, Text
 from sqlalchemy.sql import func
 from edgemind.infrastructure.persistence.database import Base
 
@@ -46,3 +48,45 @@ class TemperatureForecastModel(Base):
         server_default=func.now(),
         onupdate=func.now(),
     )
+
+
+def utc_now() -> datetime:
+    """Use one timezone-aware clock for chat ordering."""
+    return datetime.now(timezone.utc)
+
+
+class ChatConversationRow(Base):
+    """Conversation metadata scoped to a browser's anonymous identifier."""
+
+    __tablename__ = "chat_conversations"
+    __table_args__ = (
+        Index("ix_chat_conversations_owner_updated", "owner_id", "updated_at"),
+    )
+
+    id = Column(String(36), primary_key=True)
+    owner_id = Column(String(36), nullable=False)
+    title = Column(String(100), nullable=False)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=utc_now)
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=utc_now)
+
+
+class ChatMessageRow(Base):
+    """A user prompt or one Agent SSE event in its original order."""
+
+    __tablename__ = "chat_messages"
+    __table_args__ = (
+        Index("ix_chat_messages_conversation_id", "conversation_id", "id"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    conversation_id = Column(
+        String(36),
+        ForeignKey("chat_conversations.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    role = Column(String(10), nullable=False)
+    content = Column(Text, nullable=False)
+    status = Column(String(30))
+    attachments = Column(JSON, nullable=False, default=list)
+    token_usage = Column(JSON)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=utc_now)

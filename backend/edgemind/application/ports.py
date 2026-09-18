@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Protocol, Sequence
 
-from edgemind.domain.entities import SensorReading
+from edgemind.domain.entities import ChatConversation, ChatMessage, SensorReading
 from edgemind.domain.ridge_experiments import RidgeParameters
 
 
@@ -41,11 +41,34 @@ class ForecastModelRepository(Protocol):
         ...
 
 
+class ChatRepository(Protocol):
+    """Browser-scoped conversation and timeline storage."""
+
+    def list_conversations(self, owner_id: str) -> list[ChatConversation]: ...
+
+    def create_conversation(self, owner_id: str, title: str) -> ChatConversation: ...
+
+    def get_conversation(self, owner_id: str, conversation_id: str) -> ChatConversation | None: ...
+
+    def list_messages(self, conversation_id: str) -> list[ChatMessage]: ...
+
+    def add_message(
+        self,
+        conversation_id: str,
+        role: str,
+        content: str,
+        status: str | None,
+        attachments: list[dict],
+        token_usage: dict | None,
+    ) -> ChatMessage: ...
+
+
 class UnitOfWork(Protocol):
     """Transaction boundary shared by one application use case."""
 
     sensors: SensorRepository
     forecast_models: ForecastModelRepository
+    chats: ChatRepository
 
     def __enter__(self) -> "UnitOfWork":
         """Open the transaction and its repositories."""

@@ -20,3 +20,26 @@ class SensorReading:
     status: str
     recorded_at: datetime | None = None
     id: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ChatConversation:
+    """One browser-scoped conversation summary."""
+
+    id: str
+    title: str
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class ChatMessage:
+    """One persisted item in the visible chat timeline."""
+
+    id: int
+    role: str
+    content: str
+    status: str | None
+    attachments: list[dict]
+    token_usage: dict | None
+    created_at: datetime

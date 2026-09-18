@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from typing import Literal
+from uuid import UUID
 
 from pydantic import BaseModel, Field
 
@@ -11,6 +12,13 @@ class ChatRequest(BaseModel):
 
     message: str = Field(min_length=1, max_length=10_000)
     inference_model: Literal["ridge_direct", "ridge_history"] = "ridge_direct"
+    conversation_id: UUID | None = None
+
+
+class CreateConversationRequest(BaseModel):
+    """First prompt supplies a short title for a new conversation."""
+
+    title: str = Field(min_length=1, max_length=10_000)
 
 
 class SensorReadingRequest(BaseModel):

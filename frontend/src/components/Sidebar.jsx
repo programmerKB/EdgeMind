@@ -17,8 +17,10 @@ export default function Sidebar({
   onClose,
   onToggle,
   onNewChat,
-  hasMessages,
-  onOpenChat,
+  onSelectChat,
+  conversations,
+  activeConversationId,
+  historyReady,
 }) {
   return (
     <>
@@ -60,15 +62,23 @@ export default function Sidebar({
         </button>
         <div className="sidebar-section">
           {!collapsed && <p className="sidebar-label">最近紀錄</p>}
-          <button
-            className="history-item active"
-            onClick={onOpenChat}
-          >
-            <MessageSquareText size={18} />
-            {!collapsed && (
-              <span>{hasMessages ? '目前的設備診斷' : '尚無診斷紀錄'}</span>
-            )}
-          </button>
+          {conversations.length === 0 && !collapsed && (
+            <p className="history-empty">
+              {historyReady ? '尚無診斷紀錄' : '載入紀錄中…'}
+            </p>
+          )}
+          {conversations.map((conversation) => (
+            <button
+              key={conversation.id}
+              className={'history-item ' + (conversation.id === activeConversationId ? 'active' : '')}
+              onClick={() => onSelectChat(conversation.id)}
+              title={conversation.title}
+              aria-current={conversation.id === activeConversationId ? 'page' : undefined}
+            >
+              <MessageSquareText size={18} />
+              {!collapsed && <span>{conversation.title}</span>}
+            </button>
+          ))}
         </div>
         <div className="sidebar-footer">
           <div className="system-status">
