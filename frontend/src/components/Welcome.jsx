@@ -31,7 +31,7 @@ const SUGGESTIONS = [
 ];
 
 /** Render prompt shortcuts that exercise the application's core workflows. */
-export default function Welcome({ onSuggestion }) {
+export default function Welcome({ onSuggestion, disabled = false }) {
   return (
     <section className="welcome">
       <div className="welcome-mark"><BrandMark size={48} /></div>
@@ -46,6 +46,7 @@ export default function Welcome({ onSuggestion }) {
             className="suggestion-card"
             key={title}
             onClick={() => onSuggestion(prompt)}
+            disabled={disabled}
           >
             <span className="suggestion-icon"><Icon size={20} /></span>
             <span><strong>{title}</strong><small>{description}</small></span>

@@ -16,13 +16,18 @@ export default function App() {
   const messagesEndRef = useRef(null);
   const {
     messages,
+    conversations,
+    conversationId,
     input,
     isLoading,
+    historyReady,
+    historyError,
     hasMessages,
     setInput,
     sendMessage,
     stopResponse,
     newChat,
+    openChat,
     retryLastMessage,
   } = useChat(inferenceModel);
 
@@ -45,8 +50,13 @@ export default function App() {
         onClose={() => setSidebarOpen(false)}
         onToggle={() => setSidebarCollapsed((value) => !value)}
         onNewChat={startNewChat}
-        onOpenChat={() => setSidebarOpen(false)}
-        hasMessages={hasMessages}
+        onSelectChat={(id) => {
+          openChat(id);
+          setSidebarOpen(false);
+        }}
+        conversations={conversations}
+        activeConversationId={conversationId}
+        historyReady={historyReady}
       />
       <main className="main-panel">
         <Topbar
@@ -55,15 +65,17 @@ export default function App() {
           onInferenceModelChange={setInferenceModel}
           inferenceModelDisabled={isLoading}
         />
+        {historyError && <div className="history-error" role="alert">{historyError}</div>}
 
         {!hasMessages ? (
           <div className="empty-state">
-            <Welcome onSuggestion={sendMessage} />
+            <Welcome onSuggestion={sendMessage} disabled={!historyReady} />
             <Composer
               value={input}
               onChange={setInput}
               onSend={sendMessage}
               isLoading={isLoading}
+              disabled={!historyReady}
               onStop={stopResponse}
             />
           </div>
@@ -81,6 +93,7 @@ export default function App() {
               onChange={setInput}
               onSend={sendMessage}
               isLoading={isLoading}
+              disabled={!historyReady}
               onStop={stopResponse}
             />
           </>

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session, sessionmaker
 
+from edgemind.infrastructure.persistence.chat_repository import SqlAlchemyChatRepository
 from edgemind.infrastructure.persistence.model_repository import (
     SqlAlchemyForecastModelRepository,
 )
@@ -25,6 +26,7 @@ class SqlAlchemyUnitOfWork:
         self._session = self._session_factory()
         self.sensors = SqlAlchemySensorRepository(self._session)
         self.forecast_models = SqlAlchemyForecastModelRepository(self._session)
+        self.chats = SqlAlchemyChatRepository(self._session)
         return self
 
     def __exit__(self, exc_type, exc_value, traceback) -> None:

@@ -40,6 +40,18 @@ export function normalizeAttachments(attachments = []) {
   }));
 }
 
+/** Restore the API's snake_case message record into the UI timeline shape. */
+export function restoreMessage(record) {
+  return {
+    id: String(record.id),
+    role: record.role,
+    content: record.content,
+    ...(record.status ? { status: record.status } : {}),
+    attachments: normalizeAttachments(record.attachments || []),
+    ...(record.token_usage ? { tokenUsage: record.token_usage } : {}),
+  };
+}
+
 /** Find the retry target without cloning and reversing the whole conversation. */
 export function findLastUserMessage(messages) {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
